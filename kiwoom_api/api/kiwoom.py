@@ -9,12 +9,11 @@ import pandas as pd
 from PyQt5.QAxContainer import QAxWidget
 from PyQt5.QtCore import QEventLoop, QTimer
 
-from ..utility.utility import dictListToListDict, removeSign, writeJson
-from ._logger import Logger
-from .errors import (KiwoomConnectError, KiwoomProcessingError,
-                     ParameterTypeError, ParameterValueError)
-from .return_codes import FidList, ReturnCode, TRKeys
-
+# from kiwoom_api.utility import *
+from kiwoom_api.api.errors import *
+from kiwoom_api.api._logger import Logger
+from kiwoom_api.api.return_codes import *
+from kiwoom_api.utility.utility import *
 
 class Kiwoom(QAxWidget):
     """ 싱글톤 패턴 적용 """
@@ -346,7 +345,7 @@ class Kiwoom(QAxWidget):
         if not isinstance(value, str):
             value = str(value)
 
-        if (key == "계좌번호") and (value != self.accNo):
+        if (key == "계좌번호") and (value not in self.accNo.split(';')):
             raise KiwoomProcessingError("ERROR: Invalid 계좌번호")
 
         if (key == "종목코드") and (value not in self.codes):
