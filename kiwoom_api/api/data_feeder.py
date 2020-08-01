@@ -20,7 +20,7 @@ class DataFeeder:
         for k, v in kwargs:
             setattr(self, k, v)
 
-    def request(self, trCode, **kwargs):
+    def request(self, trCode, inquiry = 0, **kwargs):
         trCode = trCode.upper()
 
         if trCode == "OPTKWFID":
@@ -30,8 +30,9 @@ class DataFeeder:
             self.kiwoom.setInputValue(k, v)
 
         trName = getattr(TRName, trCode)
-        self.kiwoom.commRqData(trName, trCode, 0, "0000")
+        self.kiwoom.commRqData(trName, trCode, inquiry, "0000")
         return getattr(self.kiwoom, trCode)
+
 
     def __requestOPTKWFID(
         self, arrCode, next, codeCount, rqName="OPTKWFID", scrNo="0000", typeFlag=0

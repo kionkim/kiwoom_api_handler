@@ -64,6 +64,8 @@ class Kiwoom(QAxWidget):
         # Event 처리
         self.OnEventConnect.connect(self.eventConnect)
         self.OnReceiveTrData.connect(self.eventReceiveTrData)
+        self.OnReceiveConditionVer.connect(self.eventReceiveConditionVer)
+        self.OnReceiveTrCondition.connect(self.eventReceiveTrCondition)
         self.OnReceiveChejanData.connect(self.eventReceiveChejanData)
         self.OnReceiveMsg.connect(self.eventReceiveMsg)
 
@@ -175,6 +177,7 @@ class Kiwoom(QAxWidget):
             data = self.__getOPTKWFID(trCode, rqName)
         else:
             data = self.__getData(trCode, rqName)
+
         setattr(self, trCode, data)
 
         self.isNext = 0 if ((inquiry == "0") or (inquiry == "")) else 2  # 추가조회 여부
@@ -247,6 +250,7 @@ class Kiwoom(QAxWidget):
                 writeJson(resultDict, file_path)
             except Exception as e:
                 self.logger.error(f'ERROR: Order JSON logging {e}')
+
         
     ###############################################################
     #################### 로그인 관련 메서드   ######################
@@ -257,6 +261,15 @@ class Kiwoom(QAxWidget):
 
         if not self.connectState:
             self.dynamicCall("CommConnect()")
+            self.loginLoop = QEventLoop()
+            self.loginLoop.exec_()  # eventConnect에서 loop를 종료
+
+
+    def commTerminate(self):
+        """ 로그인 시도 """
+
+        if not self.connectState:
+            self.dynamicCall("CommTerminate()")
             self.loginLoop = QEventLoop()
             self.loginLoop.exec_()  # eventConnect에서 loop를 종료
 
@@ -275,6 +288,7 @@ class Kiwoom(QAxWidget):
     @property
     def accNo(self):
         return self.getLoginInfo("ACCNO").rstrip(";")
+
 
     def getLoginInfo(self, tag):
         """ 사용자의 tag에 해당하는 정보를 반환한다.
@@ -353,6 +367,7 @@ class Kiwoom(QAxWidget):
 
         self.dynamicCall("SetInputValue(QString, QString)", key, value)
 
+
     def commRqData(self, rqName, trCode, inquiry, scrNo):
         """ 키움서버에 TR 요청을 한다.
         요청한 데이터는 데이터 수신 이벤트 발생 시 eventReceiveTrData 매서드에서 처리
@@ -388,6 +403,7 @@ class Kiwoom(QAxWidget):
 
         # API 제한 확인
         self.requestDelayCheck.checkDelay()
+        
 
         returnCode = self.dynamicCall(
             "CommRqData(QString, QString, int, QString)",
@@ -409,6 +425,8 @@ class Kiwoom(QAxWidget):
         self.logger.debug("{}  commRqData {}".format(dt.now(), rqName))
         self.requestLoop = QEventLoop()
         self.requestLoop.exec_()
+
+
 
     def getRepeatCnt(self, trCode, rqName):
         """ 서버로 부터 전달받은 데이터의 갯수를 리턴합니다.(멀티데이터의 갯수)
@@ -588,6 +606,100 @@ class Kiwoom(QAxWidget):
         self.requestLoop = QEventLoop()
         QTimer.singleShot(1000, self.requestLoop.exit)  # timout in 1000 ms
         self.requestLoop.exec_()
+
+    ###############################################################
+    ################### 조건식 관련 메서드 #################
+    ########################## 1초 5회 제한 ########################
+    ###############################################################
+
+
+    def getCondition(self):
+        returnCode = self.dynamicCall("GetConditionLoad()")
+        if returnCode != 1:
+            self.logger.error(
+                "{} GetConditionLoad {} Request Failed!, CAUSE: {}".format(
+                    dt.now(), conditionName, getattr(ReturnCode, "CAUSE").get(returnCode)
+                )
+            )
+            raise KiwoomProcessingError()
+
+        # 루프 생성: eventReceiveTrData() 메서드에서 루프를 종료시킨다.
+        self.logger.debug("{}  condition name list requested.".format(dt.now()))
+        self.conditionLoop = QEventLoop()
+        self.conditionLoop.exec_()
+
+
+    def eventReceiveConditionVer(self, IRet):
+        if IRet != 1:
+            self.logger.error(
+                "{} sendCondition {} Request Failed!, CAUSE: {}".format(
+                    dt.now(), conditionName, getattr(ReturnCode, "CAUSE").get(returnCode)
+                )
+            )
+            raise KiwoomProcessingError()
+        
+        print('Successfully got condition version!')
+        try:
+            self.conditionLoop.exit()
+        except AttributeError:
+            pass
+
+
+    def getConditionList(self):
+        return self.dynamicCall("GetConditionNameList()")
+
+
+    def getCompByCondition(self, scrNo, conditionName, nIndex, nSearch = 0):
+        self.sendCondition(scrNo, conditionName, nIndex, nSearch)
+        print('조건검색 회사들 = ', conditionName)
+        return getattr(self, conditionName)
+
+        
+
+    def sendCondition(self, scrNo, conditionName, nIndex, nSearch = 0):
+        '''
+        # Params
+        BSTR strScrNo,    // 화면번호
+        BSTR strConditionName,  // 조건식 이름
+        int nIndex,     // 조건명 인덱스
+        int nSearch   // 조회구분, 0:조건검색, 1:실시간 조건검색
+        '''
+        if not isinstance(scrNo, str):
+            strScrNo = str(scrNo)
+
+        if not isinstance(conditionName, str):
+            conditionName = str(conditionName)
+
+        if not isinstance(nIndex, int):
+            nIndex = int(nIndex)
+        
+        if not isinstance(nSearch, int):
+            nSearch = int(nSearch)
+
+        returnCode = self.dynamicCall("SendCondition(QString, QString, int, int)", scrNo, conditionName, nIndex, nSearch)
+
+        if returnCode != 1:  # 0이외엔 실패
+            self.logger.error(
+                "{} sendCondition {} Request Failed!, CAUSE: {}".format(
+                    dt.now(), conditionName, getattr(ReturnCode, "CAUSE").get(returnCode)
+                )
+            )
+            raise KiwoomProcessingError()
+        
+        # 루프 생성: eventReceiveTrData() 메서드에서 루프를 종료시킨다.
+        self.logger.debug("{}  commRqData {}".format(dt.now(), conditionName))
+        self.conditionLoop = QEventLoop()
+        self.conditionLoop.exec_()
+
+
+
+    def eventReceiveTrCondition(self, scrNo, codeList, conditionName, nIndex, nNext):
+        try:
+            self.conditionLoop.exit()
+        except AttributeError:
+            pass
+        setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
+
 
     ###############################################################
     ################### 주문과 잔고처리 관련 메서드 #################

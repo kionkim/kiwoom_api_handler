@@ -16,7 +16,7 @@ class Logger:
 
         # 로깅용 설정파일
         self.__logger = logging.getLogger(name)
-        self.__logger.setLevel(logging.DEBUG)
+        self.__logger.setLevel(logging.INFO)
 
         fileHandler = logging.FileHandler(filePath)
         self.__logger.addHandler(fileHandler)
