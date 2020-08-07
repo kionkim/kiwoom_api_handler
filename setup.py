@@ -9,7 +9,7 @@ setup(
     license="MIT",
     url="https://github.com/donghyungko/kiwoom_api_handler.git",
     download_url="https://github.com/DonghyungKo/kiwoom_api_handler/archive/master.zip",
-    install_requires=["pandas==0.25.1", "PyQt5==5.14.1"],
+    install_requires=["PyQt5==5.14.1"],
     packages=find_packages(exclude=[]),
     keywords=["Kiwoom", "Kiwoom OPEN API+", "Kiwoom API", "키움증권"],
     python_requires=">=3.6",
