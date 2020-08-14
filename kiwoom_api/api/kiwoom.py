@@ -15,6 +15,7 @@ from kiwoom_api.api._logger import Logger
 from kiwoom_api.api.return_codes import *
 from kiwoom_api.utility.utility import *
 
+
 class Kiwoom(QAxWidget):
     """ 싱글톤 패턴 적용 """
 

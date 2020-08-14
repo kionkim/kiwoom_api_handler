@@ -821,3 +821,37 @@ class TRKeys(object):
             "확인시간",
         ],
     }
+
+    KOA_NORMAL_KP_CANCEL = {
+        "싱글데이터": [
+            "time",
+            "orderNo",
+            "rqName",
+            "scrNo",
+            "accNo",
+            "orderType",
+            "code",
+            "qty",
+            "price",
+            "hogaType",
+            "originOrderNo",
+            "msg"
+        ]
+    }
+
+    KOA_NORMAL_KP_MODIFY = {
+        "싱글데이터": [
+            "time",
+            "orderNo",
+            "rqName",
+            "scrNo",
+            "accNo",
+            "orderType",
+            "code",
+            "qty",
+            "price",
+            "hogaType",
+            "originOrderNo",
+            "msg"
+        ]
+    }
