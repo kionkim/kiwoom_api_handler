@@ -31,6 +31,7 @@ class DataFeeder:
 
         trName = getattr(TRName, trCode)
         self.kiwoom.commRqData(trName, trCode, inquiry, "0000")
+        print('result return..... = ', getattr(self.kiwoom, trCode))
         return getattr(self.kiwoom, trCode)
 
 

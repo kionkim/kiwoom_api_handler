@@ -15,6 +15,12 @@ from kiwoom_api.api._logger import Logger
 from kiwoom_api.api.return_codes import *
 from kiwoom_api.utility.utility import *
 
+import requests
+
+URL = 'http://34.64.234.40'
+PORT = '5000'
+headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+
 
 class Kiwoom(QAxWidget):
     """ 싱글톤 패턴 적용 """
@@ -35,7 +41,7 @@ class Kiwoom(QAxWidget):
 
         super().__init__()
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
-
+        self.connectState = 0 # 최초에는 미접속
         # old process kill
         # self.__killOldProcess()
 
@@ -101,9 +107,11 @@ class Kiwoom(QAxWidget):
 
         if returnCode == 0:
             msg = "{} Connection Successful".format(dt.now())
+            self.connectState = 1
         else:
             errorName = getattr(ReturnCode, "CAUSE").get(returnCode)
             msg = "{} Connection Failed : {}".format(dt.now(), errorName)
+            self.connectState = 0
 
         self.logger.debug(msg)
 
@@ -158,16 +166,69 @@ class Kiwoom(QAxWidget):
             조회("0" or "": 남은 데이터 없음, '2': 남은 데이터 있음)
         """
 
+
         # 주문 이벤트인 경우
         if "ORD" in trCode:
             # 주문번호 획득, 주문번호가 존재하면 주문 성공
             orderNo = self.getCommData(trCode, "", 0, "주문번호")
             self.orderResponse.update({"orderNo": orderNo})
+            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
+                                     headers = headers
+            )
+            if response.status_code == 200:
+                print('Request success')
+            else:
+                print('Request failed = {}'.format(response.content))
+
             try:
                 self.orderLoop.exit()
             except AttributeError:
                 pass
             return
+
+        # 취소 이벤트인 경우
+        if "KOA_NORMAL_KP_CANCEL" in trCode:
+            # 주문번호 획득, 주문번호가 존재하면 주문 성공
+            orderNo = self.getCommData(trCode, "", 0, "주문번호")
+            self.orderResponse.update({"orderNo": orderNo})
+            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
+                                     headers = headers
+            )
+            if response.status_code == 200:
+                print('Request success')
+            else:
+                print('Request failed = {}'.format(response.content))
+
+            try:
+                self.orderLoop.exit()
+            except AttributeError:
+                pass
+            return
+        
+
+        # 취소 이벤트인 경우
+        if "KOA_NORMAL_KP_MODIFY" in trCode:
+            # 주문번호 획득, 주문번호가 존재하면 주문 성공
+            orderNo = self.getCommData(trCode, "", 0, "주문번호")
+            self.orderResponse.update({"orderNo": orderNo})
+
+            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
+                                     headers = headers
+            )
+            if response.status_code == 200:
+                print('Request success')
+            else:
+                print('Request failed = {}'.format(response.content))
+
+            try:
+                self.orderLoop.exit()
+            except AttributeError:
+                pass
+            return
+
 
         # TR 이벤트인 경우, orderResponse를 삭제
         if hasattr(self, "orderResponse"):
@@ -186,7 +247,8 @@ class Kiwoom(QAxWidget):
         # TR loop 탈출
         try:
             self.requestLoop.exit()
-        except AttributeError:
+        except AttributeError as e:
+            print('Attribute error after tr receive = {}', e)
             pass
 
         # TR 이벤트 logging
@@ -239,6 +301,15 @@ class Kiwoom(QAxWidget):
                 continue
             data = self.getChejanData(fid).strip()
             resultDict[fidName] = data
+
+        response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                                     json=json.dumps(resultDict, ensure_ascii = False), 
+                                     headers = headers
+        )
+        if response.status_code == 200:
+            print('Request success')
+        else:
+            print('Request failed = {}'.format(response.content))
         self.logger.debug(resultDict)
 
         
@@ -266,6 +337,8 @@ class Kiwoom(QAxWidget):
             self.loginLoop.exec_()  # eventConnect에서 loop를 종료
 
 
+
+
     def commTerminate(self):
         """ 로그인 시도 """
 
@@ -274,8 +347,8 @@ class Kiwoom(QAxWidget):
             self.loginLoop = QEventLoop()
             self.loginLoop.exec_()  # eventConnect에서 loop를 종료
 
-    @property
-    def connectState(self):
+
+    def getConnectionState(self):
         """ 현재 접속상태를 반환합니다.
 
         Returns
@@ -283,7 +356,6 @@ class Kiwoom(QAxWidget):
         int
             0(미연결), 1(연결)
         """
-
         return self.dynamicCall("GetConnectState()")
 
     @property
@@ -405,7 +477,6 @@ class Kiwoom(QAxWidget):
         # API 제한 확인
         self.requestDelayCheck.checkDelay()
         
-
         returnCode = self.dynamicCall(
             "CommRqData(QString, QString, int, QString)",
             rqName,
@@ -652,7 +723,6 @@ class Kiwoom(QAxWidget):
 
     def getCompByCondition(self, scrNo, conditionName, nIndex, nSearch = 0):
         self.sendCondition(scrNo, conditionName, nIndex, nSearch)
-        print('조건검색 회사들 = ', conditionName)
         return getattr(self, conditionName)
 
         
