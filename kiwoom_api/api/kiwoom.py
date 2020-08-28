@@ -17,7 +17,7 @@ from kiwoom_api.utility.utility import *
 
 import requests
 
-URL = 'http://34.64.234.40'
+URL = 'http://34.64.124.13'
 PORT = '5000'
 headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
 
