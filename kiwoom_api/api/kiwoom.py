@@ -117,8 +117,9 @@ class Kiwoom(QAxWidget):
 
         try:
             self.loginLoop.exit()
-        except AttributeError:
-            pass
+        except AttributeError as e:
+            print('Attribute error after tr receive = {}', e)
+            return
 
     def eventReceiveMsg(self, scrNo, rqName, trCode, msg):
         """ 수신 메시지 이벤트
@@ -172,19 +173,11 @@ class Kiwoom(QAxWidget):
             # 주문번호 획득, 주문번호가 존재하면 주문 성공
             orderNo = self.getCommData(trCode, "", 0, "주문번호")
             self.orderResponse.update({"orderNo": orderNo})
-            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
-                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
-                                     headers = headers
-            )
-            if response.status_code == 200:
-                print('Request success')
-            else:
-                print('Request failed = {}'.format(response.content))
-
             try:
                 self.orderLoop.exit()
-            except AttributeError:
-                pass
+            except AttributeError as e:
+                print('Attribute error after tr receive = {}', e)
+                return
             return
 
         # 취소 이벤트인 경우
@@ -192,19 +185,11 @@ class Kiwoom(QAxWidget):
             # 주문번호 획득, 주문번호가 존재하면 주문 성공
             orderNo = self.getCommData(trCode, "", 0, "주문번호")
             self.orderResponse.update({"orderNo": orderNo})
-            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
-                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
-                                     headers = headers
-            )
-            if response.status_code == 200:
-                print('Request success')
-            else:
-                print('Request failed = {}'.format(response.content))
-
             try:
                 self.orderLoop.exit()
-            except AttributeError:
-                pass
+            except AttributeError as e:
+                print('Attribute error after tr receive = {}', e)
+                return
             return
         
 
@@ -213,20 +198,11 @@ class Kiwoom(QAxWidget):
             # 주문번호 획득, 주문번호가 존재하면 주문 성공
             orderNo = self.getCommData(trCode, "", 0, "주문번호")
             self.orderResponse.update({"orderNo": orderNo})
-
-            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
-                                     json=json.dumps(self.orderResponse, ensure_ascii = False), 
-                                     headers = headers
-            )
-            if response.status_code == 200:
-                print('Request success')
-            else:
-                print('Request failed = {}'.format(response.content))
-
             try:
                 self.orderLoop.exit()
-            except AttributeError:
-                pass
+            except AttributeError as e:
+                print('Attribute error after tr receive = {}', e)
+                return
             return
 
 
@@ -239,7 +215,6 @@ class Kiwoom(QAxWidget):
             data = self.__getOPTKWFID(trCode, rqName)
         else:
             data = self.__getData(trCode, rqName)
-
         setattr(self, trCode, data)
 
         self.isNext = 0 if ((inquiry == "0") or (inquiry == "")) else 2  # 추가조회 여부
@@ -249,7 +224,7 @@ class Kiwoom(QAxWidget):
             self.requestLoop.exit()
         except AttributeError as e:
             print('Attribute error after tr receive = {}', e)
-            pass
+            return
 
         # TR 이벤트 logging
         eventDetail = {
@@ -302,26 +277,18 @@ class Kiwoom(QAxWidget):
             data = self.getChejanData(fid).strip()
             resultDict[fidName] = data
 
-        response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
-                                     json=json.dumps(resultDict, ensure_ascii = False), 
-                                     headers = headers
-        )
-        if response.status_code == 200:
-            print('Request success')
-        else:
-            print('Request failed = {}'.format(response.content))
+        try:
+            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                                        json=json.dumps(resultDict, ensure_ascii = False), 
+                                        headers = headers
+            )
+            if response.status_code == 200:
+                print('Writing chejan success')
+            else:
+                print('Request failed = {}'.format(response.content))
+        except Exception:
+            print('writing chejan error....')
         self.logger.debug(resultDict)
-
-        
-        # 체결내역은 json으로 임시저장하고, 
-        # 비동기 watcher를 지정해서 DB에 쓰는 방식으로 최적화
-        if table is not None:
-            t = dt.now().strftime('%Y%m%d%H%M%S%f')
-            file_path = os.path.join(self.order_log_path, f'{table}-{t}')
-            try:
-                writeJson(resultDict, file_path)
-            except Exception as e:
-                self.logger.error(f'ERROR: Order JSON logging {e}')
 
         
     ###############################################################
@@ -713,7 +680,8 @@ class Kiwoom(QAxWidget):
         print('Successfully got condition version!')
         try:
             self.conditionLoop.exit()
-        except AttributeError:
+        except AttributeError as e:
+            print('Attribute error after tr receive = {}', e)
             pass
 
 
@@ -767,8 +735,9 @@ class Kiwoom(QAxWidget):
     def eventReceiveTrCondition(self, scrNo, codeList, conditionName, nIndex, nNext):
         try:
             self.conditionLoop.exit()
-        except AttributeError:
-            pass
+        except AttributeError as e:
+            print('Attribute error after tr receive = {}', e)
+            return
         setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
 
 

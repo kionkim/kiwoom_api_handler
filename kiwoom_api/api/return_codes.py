@@ -855,3 +855,10 @@ class TRKeys(object):
             "msg"
         ]
     }
+
+
+    KOA_NORMAL_BUY_KP_ORD= {
+        "싱글데이터": [
+            "orderNo"
+        ]
+    }
