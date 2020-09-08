@@ -17,8 +17,6 @@ from kiwoom_api.utility.utility import *
 
 import requests
 
-URL = 'http://34.64.124.13'
-PORT = '5000'
 headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
 
 
@@ -37,9 +35,11 @@ class Kiwoom(QAxWidget):
         cls.instance = cls.__getInstance
         return cls.__instance
 
-    def __init__(self):
+    def __init__(self, URL, PORT):
 
         super().__init__()
+        self.URL = URL
+        self.PORT = PORT
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
         self.connectState = 0 # 최초에는 미접속
         # old process kill
@@ -282,7 +282,7 @@ class Kiwoom(QAxWidget):
             resultDict[fidName] = data
 
         try:
-            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(self.URL, self.PORT), 
                                         json=json.dumps(resultDict, ensure_ascii = False), 
                                         headers = headers
             )
@@ -779,7 +779,7 @@ class Kiwoom(QAxWidget):
 
             resultDict = {'code': strCode, 'name': strCodeName, 'type': strType, 'conditionName': strConditionName, 'conditionIndex': strConditionIndex}
             try:
-                response = requests.post('{}:{}/kiwoom_info/receive_response'.format(URL, PORT), 
+                response = requests.post('{}:{}/kiwoom_info/receive_response'.format(self.URL, self.PORT), 
                                             json=json.dumps(resultDict, ensure_ascii = False), 
                                             headers = headers
                 )
