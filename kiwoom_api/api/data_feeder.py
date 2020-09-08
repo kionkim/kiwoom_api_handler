@@ -34,6 +34,8 @@ class DataFeeder:
         return getattr(self.kiwoom, trCode)
 
 
+
+
     def __requestOPTKWFID(
         self, arrCode, next, codeCount, rqName="OPTKWFID", scrNo="0000", typeFlag=0
     ):
@@ -79,6 +81,8 @@ class DataFeeder:
 
         self.kiwoom.commKwRqData(arrCode, next, codeCount, rqName, scrNo, typeFlag)
         return getattr(self.kiwoom, "OPTKWFID")
+
+
 
     #############################
     ###### utility methods ######

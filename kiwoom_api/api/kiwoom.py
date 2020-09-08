@@ -17,6 +17,8 @@ from kiwoom_api.utility.utility import *
 
 import requests
 
+URL = 'http://34.64.124.13'
+PORT = '5000'
 headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
 
 
@@ -35,11 +37,11 @@ class Kiwoom(QAxWidget):
         cls.instance = cls.__getInstance
         return cls.__instance
 
-    def __init__(self, URL, PORT):
+    def __init__(self, API_SERVER_URL, API_SERVER_PORT):
 
         super().__init__()
-        self.URL = URL
-        self.PORT = PORT
+        self.API_SERVER_URL = API_SERVER_URL
+        self.API_SERVER_PORT = API_SERVER_PORT
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
         self.connectState = 0 # 최초에는 미접속
         # old process kill
@@ -71,6 +73,7 @@ class Kiwoom(QAxWidget):
         # Event 처리
         self.OnEventConnect.connect(self.eventConnect)
         self.OnReceiveTrData.connect(self.eventReceiveTrData)
+        self.OnReceiveRealData.connect(self.eventReceiveRealData)
         self.OnReceiveConditionVer.connect(self.eventReceiveConditionVer)
         self.OnReceiveTrCondition.connect(self.eventReceiveTrCondition)	
         self.OnReceiveRealCondition.connect(self.eventReceiveRealCondition)
@@ -91,6 +94,20 @@ class Kiwoom(QAxWidget):
             os.mkdir(path)
         return path
         
+
+    ###############################################################
+    ################### Send log to api server ####################
+    ###############################################################  
+    def send_log(self, log):
+        response = requests.post('http://{}:{}/kiwoom_info/receive_response'.format(self.API_SERVER_URL, self.API_SERVER_PORT), 
+                                json=json.dumps(log, ensure_ascii = False), 
+                                headers = headers
+        )
+        if response.status_code == 200:
+            print('Send log success')
+        else:
+            print('Send log failed = {}'.format('!'))
+
     ###############################################################
     ################### 이벤트 발생 시 메서드   #####################
     ###############################################################
@@ -118,6 +135,7 @@ class Kiwoom(QAxWidget):
 
         try:
             self.loginLoop.exit()
+            print('loginLoop Exited')
         except AttributeError as e:
             print('Attribute error after tr receive = {}', e)
             return
@@ -176,9 +194,10 @@ class Kiwoom(QAxWidget):
             self.orderResponse.update({"orderNo": orderNo})
             try:
                 self.orderLoop.exit()
+                print('orderLoop Exited')
             except AttributeError as e:
                 print('Attribute error after tr receive = {}', e)
-                return
+                pass
             return
 
         # 취소 이벤트인 경우
@@ -188,22 +207,24 @@ class Kiwoom(QAxWidget):
             self.orderResponse.update({"orderNo": orderNo})
             try:
                 self.orderLoop.exit()
+                print('orderLoop Exited')
             except AttributeError as e:
                 print('Attribute error after tr receive = {}', e)
-                return
+                pass
             return
         
 
-        # 취소 이벤트인 경우
+        # 수정 이벤트인 경우
         if "KOA_NORMAL_KP_MODIFY" in trCode:
             # 주문번호 획득, 주문번호가 존재하면 주문 성공
             orderNo = self.getCommData(trCode, "", 0, "주문번호")
             self.orderResponse.update({"orderNo": orderNo})
             try:
                 self.orderLoop.exit()
+                print('orderLoop Exited')
             except AttributeError as e:
                 print('Attribute error after tr receive = {}', e)
-                return
+                pass
             return
 
 
@@ -220,25 +241,52 @@ class Kiwoom(QAxWidget):
 
         self.isNext = 0 if ((inquiry == "0") or (inquiry == "")) else 2  # 추가조회 여부
 
-        print('...... trCode 수신 ', trCode)
-
         # TR loop 탈출
         try:
             self.requestLoop.exit()
+            print('requestLoop Exited')
         except AttributeError as e:
             print('Attribute error after tr receive = {}', e)
-            return
+            pass
 
         # TR 이벤트 logging
-        eventDetail = {
-            "TIME": dt.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
-            "BASC_DT": dt.now().strftime("%Y-%m-%d"),
-            "EVENT": "eventReceiveTrData",
-            "REQUEST_NAME": rqName,
-            "TR_CODE": trCode,
-        }
-        self.logger.debug(eventDetail)
-        return
+        # eventDetail = {
+        #     "TIME": dt.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+        #     "BASC_DT": dt.now().strftime("%Y-%m-%d"),
+        #     "EVENT": "eventReceiveTrData",
+        #     "REQUEST_NAME": rqName,
+        #     "TR_CODE": trCode,
+        # }
+        # print(eventDetail)
+
+
+    def eventReceiveRealData(self, code, realType, realData):
+        """ 설정된 종목에 대한 실시간 정보 수신시 발생하는 이벤트
+
+        Parameters
+        ----------
+        code: str
+            종목코드
+        realType: str
+            fid의 갯수
+        realData: str
+            fidList 구분은 \t 이다.
+        """
+        print('code = ', code)
+        print('realType = ', realType)
+
+        if realType in RealType.FIDS:
+            fidList = getattr(RealType, realType)
+
+            resultDict = {}
+            for (k, v) in fidList.items():
+                resultDict[v] = self.getCommRealData(realType, k)
+    
+            print('realType = {}, return = {}'.format(realType, resultDict))
+            resultDict["BASC_DT"] = dt.now().strftime("%Y-%m-%d")
+            # response = self.send_log({'log_type': 'realtime', 'log': resultDict})
+            # print('log response in realtype = ', response)
+
 
     def eventReceiveChejanData(self, gubun, itemCnt, fidList):
         """ 주문 접수/확인 수신시 이벤트
@@ -256,47 +304,37 @@ class Kiwoom(QAxWidget):
         if gubun != '0': # 주문접수/주문체결이 아니면 logging 안함
             return
         
+        print('fid List in receive chejan data = ', fidList)
         orderStatus = self.getChejanData('913').strip() # 주문상태 "접수" or "체결" or "확인"
+        print('orderStatus in chejan data = ', orderStatus)
         if orderStatus == '접수':
-            table = 'orders_submitted'
             fidDict = getattr(FidList, 'SUBMITTED')
         elif orderStatus == '체결':
-            table = 'orders_executed'
             fidDict = getattr(FidList, 'EXECUTED')
         elif orderStatus == '확인': #주문취소
-            table = 'orders_cancelled'
             fidDict = getattr(FidList, 'CANCELLED')
         else:
-            table = None # 지정된 table 명이 없으면 json파일 생성 안함
             fidDict = getattr(FidList, 'ALL')
+
+        print('fid dict for chejan data = ', fidDict)
 
         resultDict = {
             "BASC_DT": dt.now().strftime("%Y-%m-%d")
         }
         fids = fidList.split(";")
+
         for fid in fids:
             fidName = fidDict.get(fid)
             if fidName is None:
                 continue
             data = self.getChejanData(fid).strip()
             resultDict[fidName] = data
-
-        try:
-            response = requests.post('{}:{}/kiwoom_info/receive_response'.format(self.URL, self.PORT), 
-                                        json=json.dumps(resultDict, ensure_ascii = False), 
-                                        headers = headers
-            )
-            print('resultDict = ', json.dumps(resultDict))
-            if response.status_code == 200:
-                print('Writing chejan success')
-            else:
-                print('Request failed = {}'.format('!'))
-        except Exception:
-            print('writing chejan error....')
-
-        self.logger.debug(resultDict)
-
         
+        self.send_log({'log_type': 'chejan', 'log': resultDict})
+
+
+
+
     ###############################################################
     #################### 로그인 관련 메서드   ######################
     ###############################################################
@@ -470,6 +508,7 @@ class Kiwoom(QAxWidget):
         self.logger.debug("{}  commRqData {}".format(dt.now(), rqName))
         self.requestLoop = QEventLoop()
         self.requestLoop.exec_()
+        print('requestLoop entered')
 
 
 
@@ -546,6 +585,7 @@ class Kiwoom(QAxWidget):
 
         return data.strip()
 
+
     def getCommDataEx(self, trCode, multiDataName):
         """ 멀티 데이터 획득
         조회 수신데이터 크기가 큰 차트데이터를 한번에 가져올 목적으로 만든 전용함수입니다.
@@ -570,6 +610,8 @@ class Kiwoom(QAxWidget):
             "GetCommDataEx(QString, QString)", trCode, multiDataName
         )
         return data
+
+
 
     def commKwRqData(self, arrCode, next, codeCount, rqName, scrNo, typeFlag=0):
         """ 복수종목조회 메서드(관심종목조회 메서드라고도 함).
@@ -651,6 +693,23 @@ class Kiwoom(QAxWidget):
         self.requestLoop = QEventLoop()
         QTimer.singleShot(1000, self.requestLoop.exit)  # timout in 1000 ms
         self.requestLoop.exec_()
+        print('requestLoop entered')
+
+
+    # strRealType – 실시간 구분
+    # nFid – 실시간 아이템
+    # Ex) 현재가출력 - openApi.GetCommRealData(“주식시세”, 10);
+    # 참고)실시간 현재가는 주식시세, 주식체결 등 다른 실시간타입(RealType)으로도 수신가능
+    # https://programtalk.com/vs2/python/11670/QWebview-plus/plus/kiwoom.py/
+    def getCommRealData(self, realType, fid):
+        if not (
+            isinstance(realType, str)
+            and isinstance(fid, str)
+        ):
+            raise ParameterTypeError()
+
+        data = self.dynamicCall("GetCommRealData(QString, int)", realType, fid)
+        return data.strip()
 
     ###############################################################
     ################### 조건식 관련 메서드 #################
@@ -672,6 +731,7 @@ class Kiwoom(QAxWidget):
         self.logger.debug("{}  condition name list requested.".format(dt.now()))
         self.conditionLoop = QEventLoop()
         self.conditionLoop.exec_()
+        print('conditionLoop entered')
 
 
     def eventReceiveConditionVer(self, IRet):
@@ -687,6 +747,7 @@ class Kiwoom(QAxWidget):
         print('Successfully got condition version!')
         try:
             self.conditionLoop.exit()
+            print('conditionLoop Exited')
         except AttributeError as e:
             print('Attribute error after tr receive = {}', e)
             pass
@@ -699,10 +760,8 @@ class Kiwoom(QAxWidget):
     def getCompByCondition(self, scrNo, conditionName, nIndex, nSearch):
 
         self.sendCondition(scrNo, conditionName, nIndex, nSearch)
-        if nSearch == '0':
-            return getattr(self, conditionName)
-        else: 
-            return
+        return getattr(self, conditionName)
+
 
         
 
@@ -743,59 +802,82 @@ class Kiwoom(QAxWidget):
        
         self.logger.debug("{}  commRqData {}".format(dt.now(), conditionName))
 
+ 
+         # 루프 생성: eventReceiveTrCondition() 메서드에서 루프를 종료시킨다.
+        self.conditionLoop = QEventLoop()
+        self.conditionLoop.exec_()
 
-        if nSearch == 0:
-             # 루프 생성: eventReceiveTrCondition() 메서드에서 루프를 종료시킨다.
-            self.conditionLoop = QEventLoop()
-            self.conditionLoop.exec_()
             
 
+   # 실시간 조건검색을 중지합니다.
+    # ※ 화면당 실시간 조건검색은 최대 10개로 제한되어 있어서 더 이상 실시간 조건검색을 원하지 않는 조건은 중지해야만 카운트 되지 않습니다.
+    def sendConditionStop(self, scrNo, conditionName, index):
+        self.dynamicCall("SendConditionStop(QString, QString, int)", scrNo, conditionName, index)
 
 
     def eventReceiveTrCondition(self, scrNo, codeList, conditionName, nIndex, nNext):
+        print('event Receive Tr condition = ', scrNo, codeList, conditionName, nIndex, nNext)
+        setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
         try:
             self.conditionLoop.exit()
+            print('conditionLoop Exited')
         except AttributeError as e:
             print('Attribute error after tr receive = {}', e)
             return
-        setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
+        
 
 
     # https://devshj.tistory.com/14
-    def eventReceiveRealCondition(self, strCode, strType, strConditionName, strConditionIndex):    # 조건검색 실시간 조회시 반환되는 값을 받는 함수
+    def eventReceiveRealCondition(self, code, type, conditionName, conditionIndex):    # 조건검색 실시간 조회시 반환되는 값을 받는 함수
         '''실시간 편입/이탈 종목이 발생될 때마다 호출됩니다.'''
 
         
         try:
-            print("receive_real_condition strCode: " + str(strCode) + ", strType: " + str(strType) + ", strConditionName: " + str(strConditionName) + ", strConditionIndex: " + str(strConditionIndex))
-            setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
-            logDateTime = datetime.today().strftime("%Y-%m-%d %H:%M:%S")  # 화면에 노출할 날짜를 만듬 (YYYY-mm-dd HH:MM:SS 형태)
-            strCodeName = self.kiwoom.dynamicCall("GetMasterCodeName(QString)", [strCode]).strip()  # 종목 코드로 종목 이름을 가져옴
+            print("receive_real_condition strCode: " + str(code) + ", Type: " + str(type) + ", ConditionName: " + str(conditionName) + ", ConditionIndex: " + str(conditionIndex))
+            logDateTime = dt.today().strftime("%Y-%m-%d %H:%M:%S")  # 화면에 노출할 날짜를 만듬 (YYYY-mm-dd HH:MM:SS 형태)
+            strCodeName = self.dynamicCall("GetMasterCodeName(QString)", [code]).strip()  # 종목 코드로 종목 이름을 가져옴
     
-            if str(strType) == "I":  # 편입 종목이라면
-                print(str(logDateTime) + " 편입 신호 : " + str(strCode) + ", " + str(strCodeName)) # 트레이딩 화면 내역에 로그를 남김
+            if str(type) == "I":  # 편입 종목이라면
+                print(str(logDateTime) + " 편입 신호 : " + str(code) + ", " + str(codeName)) # 트레이딩 화면 내역에 로그를 남김
             elif str(strType) == "D":   # 이탈 종목이라면
-                print(str(logDateTime) + " 이탈 신호 : " + str(strCode) + ", " + str(strCodeName)) # 트레이딩 화면 내역에 로그를 남김
+                print(str(logDateTime) + " 이탈 신호 : " + str(code) + ", " + str(codeName)) # 트레이딩 화면 내역에 로그를 남김
 
-            resultDict = {'code': strCode, 'name': strCodeName, 'type': strType, 'conditionName': strConditionName, 'conditionIndex': strConditionIndex}
-            try:
-                response = requests.post('{}:{}/kiwoom_info/receive_response'.format(self.URL, self.PORT), 
-                                            json=json.dumps(resultDict, ensure_ascii = False), 
-                                            headers = headers
-                )
-                print('resultDict = ', json.dumps(resultDict))
-                if response.status_code == 200:
-                    print('Writing condition success')
-                else:
-                    print('Request failed = {}'.format('!'))
-
-            except Exception:
-                print('writing condition error....')
+            resultDict = {'code': code, 'name': codeName, 'type': type, 'conditionName': conditionName, 'conditionIndex': conditionIndex}
+            
+            self.send_log({'log_type': 'realtime_condition', 'log': resultDict})
+            
         except Exception as e:
             print('Realtime Condition error = {}', e)
             return
         
 
+    ###############################################################
+    ############### 실시간 조회와 관련된 메서드 #####################
+    # https://programtalk.com/vs2/python/11670/QWebview-plus/plus/kiwoom.py/
+    # 실시간 등록을 한다.
+    # strScreenNo : 화면번호
+    # strCodeList : 종목코드리스트(ex: 039490;005930;…)
+    # strFidList : FID번호(ex:9001;10;13;…)
+    #   9001 – 종목코드
+    #   10 - 현재가
+    #   13 - 누적거래량
+    # strOptType : 타입(“0”, “1”)
+    # 타입 “0”은 항상 마지막에 등록한 종목들만 실시간등록이 됩니다.
+    # 타입 “1”은 이전에 실시간 등록한 종목들과 함께 실시간을 받고 싶은 종목을 추가로 등록할 때 사용합니다.
+    # ※ 종목, FID는 각각 한번에 실시간 등록 할 수 있는 개수는 100개 입니다.
+    def setRealReg(self, screenNo, codeList, fidList, optType):
+        return self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screenNo, codeList, fidList, optType)
+
+    # 리얼 시세를 끊는다.
+    # 화면 내 모든 리얼데이터 요청을 제거한다.
+    # 화면을 종료할 때 반드시 위 함수를 호출해야 한다.
+    # Ex) openApi.DisconnectRealData(“0101”);
+
+
+    def disconnectRealData(self, scnNo):
+        self.dynamicCall("DisconnectRealData(QString)", scnNo)
+
+ 
     ###############################################################
     ################### 주문과 잔고처리 관련 메서드 #################
     ########################## 1초 5회 제한 ########################
@@ -904,6 +986,9 @@ class Kiwoom(QAxWidget):
         self.orderLoop = QEventLoop()
         #QTimer.singleShot(1000, self.orderLoop.exit)  # timout in 1000 ms
         self.orderLoop.exec_()
+        print('orderLoop entered')
+
+
 
     def getChejanData(self, fid):
         """ 주문접수, 주문체결, 잔고정보를 얻어오는 메서드
@@ -925,6 +1010,8 @@ class Kiwoom(QAxWidget):
         data = self.dynamicCall(f'GetChejanData("{fid}")')
         return data
 
+
+
     def __getData(self, trCode, rqName):
 
         returnDict = {}
@@ -933,6 +1020,8 @@ class Kiwoom(QAxWidget):
         if getattr(TRKeys, trCode).get("싱글데이터", False):
             returnDict["싱글데이터"] = self.__getSingleData(trCode, rqName)
         return returnDict
+
+
 
     def __getSingleData(self, trCode, rqName):
 
@@ -945,6 +1034,8 @@ class Kiwoom(QAxWidget):
                 val = removeSign(val)
             data[key] = val
         return data
+
+
 
     def __getMultiData(self, trCode, rqName):
 
@@ -962,6 +1053,8 @@ class Kiwoom(QAxWidget):
             data.append(tmpDict)
         return data
 
+
+
     def __getOPTKWFID(self, trCode, rqName):
 
         data = {}
@@ -976,6 +1069,8 @@ class Kiwoom(QAxWidget):
         data = dictListToListDict(data)  # dict of list to list of dict
         data = {"멀티데이터": data}
         return data
+
+
 
     def __getCodeListByMarket(self, market):
         """시장 구분에 따른 종목코드의 목록을 List로 반환한다.
