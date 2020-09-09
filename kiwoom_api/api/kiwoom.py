@@ -830,11 +830,11 @@ class Kiwoom(QAxWidget):
         try:
             print("receive_real_condition strCode: " + str(code) + ", Type: " + str(type) + ", ConditionName: " + str(conditionName) + ", ConditionIndex: " + str(conditionIndex))
             logDateTime = dt.today().strftime("%Y-%m-%d %H:%M:%S")  # 화면에 노출할 날짜를 만듬 (YYYY-mm-dd HH:MM:SS 형태)
-            CodeName = self.dynamicCall("GetMasterCodeName(QString)", [code]).strip()  # 종목 코드로 종목 이름을 가져옴
+            codeName = self.dynamicCall("GetMasterCodeName(QString)", [code]).strip()  # 종목 코드로 종목 이름을 가져옴
     
             if str(type) == "I":  # 편입 종목이라면
                 print(str(logDateTime) + " 편입 신호 : " + str(code) + ", " + str(codeName)) # 트레이딩 화면 내역에 로그를 남김
-            elif str(strType) == "D":   # 이탈 종목이라면
+            elif str(type) == "D":   # 이탈 종목이라면
                 print(str(logDateTime) + " 이탈 신호 : " + str(code) + ", " + str(codeName)) # 트레이딩 화면 내역에 로그를 남김
 
             resultDict = {'code': code, 'name': codeName, 'type': type, 'conditionName': conditionName, 'conditionIndex': conditionIndex}
