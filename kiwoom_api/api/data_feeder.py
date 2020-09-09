@@ -20,24 +20,24 @@ class DataFeeder:
         for k, v in kwargs:
             setattr(self, k, v)
 
-    def request(self, trCode, inquiry = 0, **kwargs):
+    def request(self, trCode, scrNo, inquiry = 0, **kwargs):
         trCode = trCode.upper()
-
+        print('scrNo in data feeder = ', scrNo)
         if trCode == "OPTKWFID":
-            return self.__requestOPTKWFID(**kwargs)
+            return self.__requestOPTKWFID(scrNo, **kwargs)
 
         for k, v in kwargs.items():
             self.kiwoom.setInputValue(k, v)
 
         trName = getattr(TRName, trCode)
-        self.kiwoom.commRqData(trName, trCode, inquiry, "0000")
+        self.kiwoom.commRqData(trName, trCode, inquiry, scrNo)
         return getattr(self.kiwoom, trCode)
 
 
 
 
     def __requestOPTKWFID(
-        self, arrCode, next, codeCount, rqName="OPTKWFID", scrNo="0000", typeFlag=0
+        self, scrNo, arrCode, next, codeCount, rqName="OPTKWFID", typeFlag=0
     ):
         """ 복수종목조회 메서드(관심종목조회 메서드라고도 함).
 
@@ -78,7 +78,7 @@ class DataFeeder:
         str 
             0(정상), -200(시세과부하), -201(조회전문작성 에러)
         """
-
+        print('scrNo = {}. arrCode = {}, next = {}, codeCount = {}, rqName = {}, scrNo = {}, typeFlag = {}'.format(scrNo, arrCode, next, codeCount, rqName, scrNo, typeFlag))
         self.kiwoom.commKwRqData(arrCode, next, codeCount, rqName, scrNo, typeFlag)
         return getattr(self.kiwoom, "OPTKWFID")
 

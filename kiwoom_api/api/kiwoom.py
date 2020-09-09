@@ -284,7 +284,7 @@ class Kiwoom(QAxWidget):
     
             print('realType = {}, return = {}'.format(realType, resultDict))
             resultDict["BASC_DT"] = dt.now().strftime("%Y-%m-%d")
-            # response = self.send_log({'log_type': 'realtime', 'log': resultDict})
+            self.send_log({'log_type': 'realtime', 'code': code, 'realType': realType, 'log': resultDict})
             # print('log response in realtype = ', response)
 
 
@@ -799,10 +799,6 @@ class Kiwoom(QAxWidget):
                     dt.now(), conditionName, nSearch
                 )
             )
-       
-        self.logger.debug("{}  commRqData {}".format(dt.now(), conditionName))
-
- 
          # 루프 생성: eventReceiveTrCondition() 메서드에서 루프를 종료시킨다.
         self.conditionLoop = QEventLoop()
         self.conditionLoop.exec_()
@@ -816,7 +812,6 @@ class Kiwoom(QAxWidget):
 
 
     def eventReceiveTrCondition(self, scrNo, codeList, conditionName, nIndex, nNext):
-        print('event Receive Tr condition = ', scrNo, codeList, conditionName, nIndex, nNext)
         setattr(self, conditionName, [x for x in codeList.split(';') if len(x) > 0])
         try:
             self.conditionLoop.exit()
@@ -830,12 +825,12 @@ class Kiwoom(QAxWidget):
     # https://devshj.tistory.com/14
     def eventReceiveRealCondition(self, code, type, conditionName, conditionIndex):    # 조건검색 실시간 조회시 반환되는 값을 받는 함수
         '''실시간 편입/이탈 종목이 발생될 때마다 호출됩니다.'''
-
+        print("receive_real_condition strCode: " + str(code) + ", Type: " + str(type) + ", ConditionName: " + str(conditionName) + ", ConditionIndex: " + str(conditionIndex))
         
         try:
             print("receive_real_condition strCode: " + str(code) + ", Type: " + str(type) + ", ConditionName: " + str(conditionName) + ", ConditionIndex: " + str(conditionIndex))
             logDateTime = dt.today().strftime("%Y-%m-%d %H:%M:%S")  # 화면에 노출할 날짜를 만듬 (YYYY-mm-dd HH:MM:SS 형태)
-            strCodeName = self.dynamicCall("GetMasterCodeName(QString)", [code]).strip()  # 종목 코드로 종목 이름을 가져옴
+            CodeName = self.dynamicCall("GetMasterCodeName(QString)", [code]).strip()  # 종목 코드로 종목 이름을 가져옴
     
             if str(type) == "I":  # 편입 종목이라면
                 print(str(logDateTime) + " 편입 신호 : " + str(code) + ", " + str(codeName)) # 트레이딩 화면 내역에 로그를 남김
@@ -847,7 +842,7 @@ class Kiwoom(QAxWidget):
             self.send_log({'log_type': 'realtime_condition', 'log': resultDict})
             
         except Exception as e:
-            print('Realtime Condition error = {}', e)
+            print('Realtime Condition error = {}'.format(e))
             return
         
 
